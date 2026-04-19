@@ -1,0 +1,56 @@
+{
+  "name": "coros-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for COROS Training Hub workflows, activity analysis, and planning",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-org/coros-mcp-server.git"
+  },
+  "homepage": "https://github.com/your-org/coros-mcp-server#readme",
+  "bugs": {
+    "url": "https://github.com/your-org/coros-mcp-server/issues"
+  },
+  "type": "module",
+  "bin": {
+    "coros-mcp-server": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "examples"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "coros",
+    "running",
+    "training",
+    "gemini"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "auth:browser-login": "npm run build && node dist/cli.js auth login",
+    "start": "node dist/cli.js serve",
+    "smoke:profile": "node scripts/smoke-auth-profile.mjs",
+    "smoke:auth-session": "node scripts/smoke-auth-session.mjs",
+    "smoke:plan-flow": "node scripts/smoke-plan-flow.mjs",
+    "smoke:activities": "node scripts/smoke-activities.mjs",
+    "smoke:analysis": "node scripts/smoke-analysis.mjs",
+    "smoke:recommendation": "node scripts/smoke-recommendation.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.5",
+    "playwright-core": "^1.59.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

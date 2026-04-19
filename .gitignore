@@ -1,0 +1,30 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Dependencies & build
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# COROS / MCP local state (sessions, browser auth)
+session.json
+*.session.json
+
+# Playwright / MCP tooling caches
+.playwright/
+.playwright-mcp/
+.playwright-cli/
+playwright-report/
+test-results/
+
+# Tooling
+.gemini/
+tmp/
+temp/
+*.log

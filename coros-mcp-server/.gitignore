@@ -1,0 +1,17 @@
+node_modules/
+dist/
+
+.env
+.env.*
+
+.DS_Store
+.gemini/
+
+session.json
+*.session.json
+
+.playwright/
+playwright-report/
+
+tmp/
+temp/
