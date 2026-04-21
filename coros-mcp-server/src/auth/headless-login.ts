@@ -43,27 +43,40 @@ export async function runHeadlessLogin(account?: string, password?: string) {
     // Password input has type password
     
     console.log("Filling login form...");
-    await page.fill('input[placeholder*="手机号"], input[placeholder*="邮箱"], input[placeholder*="Email"], input[type="text"]', user);
-    await page.fill('input[type="password"]', pass);
+    const userField = page.locator('input[placeholder*="手机号"], input[placeholder*="邮箱"], input[placeholder*="Email"], input[type="text"]').first();
+    await userField.fill(user);
+    await page.waitForTimeout(500);
+    const passField = page.locator('input[type="password"]').first();
+    await passField.fill(pass);
+    await page.waitForTimeout(500);
     
-    // Check privacy policy if it exists and is not checked
-    const privacyCheckbox = page.locator('input[type="checkbox"], .ant-checkbox-input').last();
-    if (await privacyCheckbox.isVisible()) {
-      console.log("Checking privacy policy...");
-      await privacyCheckbox.check({ force: true });
+    // Check privacy policy
+    console.log("Looking for privacy policy checkbox...");
+    const privacyArea = page.locator('span:has-text("我已阅读并同意"), .ant-checkbox-wrapper').last();
+    if (await privacyArea.isVisible()) {
+      console.log("Checking privacy policy via click...");
+      await privacyArea.click({ force: true });
+      await page.waitForTimeout(500);
     }
     
-    console.log("Submitting...");
-    const loginButton = page.locator('button:has-text("登录"), button:has-text("Login"), button[type="submit"]');
+    console.log("Submitting login form...");
+    const loginButton = page.locator('.ant-btn-primary:has-text("登录"), .ant-btn-primary:has-text("Login"), button[type="submit"]').first();
     await loginButton.click();
 
     // Wait for navigation or cookie
-    console.log("Waiting for authentication...");
+    console.log("Waiting for authentication (timeout: 45s)...");
     
     let tokenValue: string | null = null;
-    const deadline = Date.now() + 45000; // Increased to 45 seconds
+    const deadline = Date.now() + 45000;
+    let lastUrl = "";
     
     while (Date.now() < deadline) {
+      const currentUrl = page.url();
+      if (currentUrl !== lastUrl) {
+        console.log(`Current URL: ${currentUrl}`);
+        lastUrl = currentUrl;
+      }
+
       const cookies = await context.cookies([
         "https://t.coros.com",
         "https://www.coros.com",
@@ -71,14 +84,22 @@ export async function runHeadlessLogin(account?: string, password?: string) {
       ]);
       const tokenCookie = cookies.find((c) => c.name === cookieName);
       if (tokenCookie?.value) {
+        console.log("Token found in cookies!");
         tokenValue = tokenCookie.value;
         break;
       }
       
-      // Check for visible error messages on the page
-      const errorText = await page.innerText(".ant-message-notice-content, .error-message, .message-error").catch(() => null);
-      if (errorText) {
-        throw new Error(`Login failed: ${errorText}`);
+      // Check for visible error messages
+      const errorMsg = page.locator(".ant-message-notice-content, .error-message, .message-error");
+      if (await errorMsg.isVisible()) {
+        const text = await errorMsg.innerText();
+        throw new Error(`Login failed with error on page: ${text}`);
+      }
+      
+      // Check for CAPTCHA
+      const captcha = page.locator(".nc_wrapper, #nc_1_wrapper, .geetest_holder");
+      if (await captcha.isVisible()) {
+        throw new Error("Login blocked by CAPTCHA. Headless login is not possible from this IP.");
       }
       
       await page.waitForTimeout(2000);
