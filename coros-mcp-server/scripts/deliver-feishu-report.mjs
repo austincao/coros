@@ -39,7 +39,7 @@ async function getFeishuToken() {
 
 async function sendFeishuCard(token, receiveId, cardData) {
   const receiveIdType = process.env.FEISHU_RECEIVE_ID_TYPE || 'open_id';
-  console.log(`Attempting to send message to ${receiveIdType}: ${receiveId}`);
+  console.log(`Target: ${receiveIdType} = ${receiveId.slice(0, 6)}... (length: ${receiveId.length})`);
   
   const response = await fetch(`https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=${receiveIdType}`, {
     method: "POST",
@@ -186,6 +186,10 @@ async function main() {
 }
 
 main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
+ain().catch(err => {
   console.error(err);
   process.exit(1);
 });
