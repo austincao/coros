@@ -286,6 +286,99 @@ export interface AnalyzeTrainingBalanceOutput {
   suggestions: string[];
 }
 
+export interface RunningWeekReportInput {
+  end_day?: CorosDate;
+  /** When true, include an HTML report. Charts load Apache ECharts from jsDelivr (needs network when opening the file). Default true. */
+  include_html?: boolean;
+  /** Cap COROS detail fetches for lap-based HR and pace; default 30. */
+  max_activity_details?: number;
+  raw?: boolean;
+}
+
+export interface RunningWeekReportHrZoneDefinition {
+  zone: "z1" | "z2" | "z3" | "z4" | "z5";
+  label: string;
+  bpm_low: number;
+  bpm_high: number;
+}
+
+export interface RunningWeekReportDaily {
+  date: CorosDate;
+  run_count: number;
+  distance_km: number;
+  training_load: number;
+  workout_time_s: number;
+}
+
+export interface RunningWeekReportActivityRow {
+  date: CorosDate;
+  label_id: string;
+  sport_type: number;
+  name: string;
+  distance_km: number;
+  training_load: number;
+  workout_time_s: number;
+  avg_hr: number;
+  classification: "easy" | "quality" | "long";
+  detail_fetched: boolean;
+}
+
+export interface RunningWeekReportPaceBin {
+  low_sec_per_km: number;
+  high_sec_per_km: number;
+  distance_km: number;
+}
+
+export interface RunningWeekReportOutput {
+  date_from: CorosDate;
+  date_to: CorosDate;
+  generated_at: string;
+  sport_filter: "run";
+  profile: {
+    nickname: string;
+    max_hr: number;
+    resting_hr: number;
+    lthr: number;
+  };
+  methodology: string[];
+  totals: {
+    run_count: number;
+    distance_km: number;
+    training_load: number;
+    workout_time_s: number;
+  };
+  intensity_counts: {
+    easy: number;
+    quality: number;
+    long: number;
+  };
+  hr_zones_seconds: {
+    z1: number;
+    z2: number;
+    z3: number;
+    z4: number;
+    z5: number;
+  };
+  /** Time in Z1–Z2 (aerobic base), Z3 (threshold / mixed), Z4–Z5 (high intensity). */
+  hr_time_groups_seconds: {
+    aerobic_base: number;
+    threshold: number;
+    high_intensity: number;
+  };
+  /** Sum of COROS training effect scores from activities where detail was fetched (not a weekly TE metric). */
+  training_effect?: {
+    aerobic_sum: number;
+    anaerobic_sum: number;
+    sessions_count: number;
+  };
+  hr_zone_definitions: RunningWeekReportHrZoneDefinition[];
+  daily: RunningWeekReportDaily[];
+  pace_bins: RunningWeekReportPaceBin[];
+  activities: RunningWeekReportActivityRow[];
+  /** Offline HTML; empty string when include_html is false. */
+  html: string;
+}
+
 export interface RecommendNextWeekInput {
   end_day?: CorosDate;
   goal?: "general_running" | "10k" | "half_marathon";

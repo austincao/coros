@@ -1,0 +1,72 @@
+name: COROS Feishu Report
+
+on:
+  schedule:
+    - cron: '0 1 * * 3,0' # 周三和周日 北京时间 09:00 (UTC 01:00)
+  workflow_dispatch:      # 支持手动触发
+
+jobs:
+  deliver-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: coros-mcp-server/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd coros-mcp-server
+          npm install
+
+      - name: Build project
+        run: |
+          cd coros-mcp-server
+          npm run build
+
+      - name: Install Playwright Browsers
+        run: |
+          cd coros-mcp-server
+          npx playwright install chromium --with-deps
+
+      - name: COROS Headless Login
+        run: |
+          cd coros-mcp-server
+          # 使用 --headless 登录并将 session 保存到默认路径
+          node dist/cli.js auth login --headless
+        env:
+          COROS_ACCOUNT: ${{ secrets.COROS_ACCOUNT }}
+          COROS_PASSWORD: ${{ secrets.COROS_PASSWORD }}
+          CHROME_EXECUTABLE_PATH: google-chrome
+
+      - name: Generate and Deliver Report
+        run: |
+          cd coros-mcp-server
+          node scripts/deliver-feishu-report.mjs
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_RECEIVE_ID: ${{ secrets.FEISHU_RECEIVE_ID }}
+          FEISHU_RECEIVE_ID_TYPE: ${{ secrets.FEISHU_RECEIVE_ID_TYPE || 'open_id' }}
+
+      - name: Notify Failure
+        if: failure()
+        run: |
+          cd coros-mcp-server
+          # 简单的失败通知逻辑可以写在这里，或者调用一个专门的脚本
+          # 借用 curl 发送一个简单的飞书通知
+          TOKEN=$(curl -s -X POST "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal" \
+            -H "Content-Type: application/json" \
+            -d "{\"app_id\":\"${{ secrets.FEISHU_APP_ID }}\",\"app_secret\":\"${{ secrets.FEISHU_APP_SECRET }}\"}" | jq -r .tenant_access_token)
+          
+          curl -X POST "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=${{ secrets.FEISHU_RECEIVE_ID_TYPE || 'open_id' }}" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"receive_id\":\"${{ secrets.FEISHU_RECEIVE_ID }}\",\"msg_type\":\"text\",\"content\":\"{\\\"text\\\":\\\"❌ COROS 周报推送失败，请检查 GitHub Actions 日志。\\\"}\"}"

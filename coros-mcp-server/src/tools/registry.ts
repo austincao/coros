@@ -5,6 +5,7 @@ import type {
   AnalyzeActivityInput,
   AnalyzeRecentWeekInput,
   AnalyzeTrainingBalanceInput,
+  RunningWeekReportInput,
   CreatePlanInput,
   CreateWorkoutInput,
   ExecutePlanInput,
@@ -110,6 +111,12 @@ export function createToolRegistry(sessionProvider: SessionProvider) {
       description: "Compare recent run load versus baseline run load",
       handler: async (input: AnalyzeTrainingBalanceInput) =>
         analysisService.analyzeTrainingBalance(input),
+    },
+    coros_running_week_report: {
+      name: "coros_running_week_report",
+      description:
+        "Build a running-only 7-day weekly report payload plus offline HTML (charts-first, minimal coaching copy)",
+      handler: async (input: RunningWeekReportInput) => analysisService.runningWeekReport(input),
     },
     coros_recommend_next_week: {
       name: "coros_recommend_next_week",

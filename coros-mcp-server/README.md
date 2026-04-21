@@ -34,6 +34,7 @@ It currently supports three major areas:
 - Analyze a single activity
 - Analyze the recent 7-day training pattern
 - Compare recent running load against baseline
+- Build a running-only 7-day chart report (HTML with ECharts via CDN + structured metrics)
 - Recommend next week's microcycle
 
 ## Current Tool Set
@@ -51,6 +52,7 @@ The server currently registers these MCP tools:
 - `coros_analyze_activity`
 - `coros_analyze_recent_week`
 - `coros_analyze_training_balance`
+- `coros_running_week_report`
 - `coros_recommend_next_week`
 - `coros_create_workout`
 - `coros_create_plan`
@@ -73,6 +75,7 @@ The server is intentionally split into simple layers:
   - `profile-service`
   - `activity-service`
   - `analysis-service`
+  - `report` (weekly running HTML report builder)
   - `recommendation-service`
   - `workout-service`
   - `plan-service`
@@ -350,6 +353,28 @@ Verifies:
 - `coros_analyze_training_balance`
 - `coros_analyze_activity`
 
+### Running week report (HTML + ECharts)
+
+Self-test render (no COROS API calls; uses compiled `dist/` modules). Opening the generated HTML in a browser loads ECharts from jsDelivr (network required for charts):
+
+
+```bash
+npm run build
+npm run selftest:running-week-report
+```
+
+Live MCP smoke (requires a valid token via `COROS_ACCESS_TOKEN` or a valid `~/.config/coros-mcp/session.json`; writes `tmp/smoke-running-week-report.html`):
+
+```bash
+COROS_ACCESS_TOKEN="YOUR_COROS_TOKEN" npm run smoke:running-week-report
+```
+
+Verifies:
+
+- `coros_running_week_report` is registered
+- `coros_auth_status` succeeds
+- The tool returns structured metrics plus non-trivial `html`
+
 ### Recommendation
 
 ```bash
@@ -466,6 +491,8 @@ coros-mcp-server/
 │   ├── smoke-plan-flow.mjs
 │   ├── smoke-activities.mjs
 │   ├── smoke-analysis.mjs
+│   ├── selftest-running-week-report.mjs
+│   ├── smoke-running-week-report.mjs
 │   └── smoke-recommendation.mjs
 ├── src/
 │   ├── auth/
@@ -491,6 +518,8 @@ npm run smoke:profile
 npm run smoke:plan-flow
 npm run smoke:activities
 npm run smoke:analysis
+npm run selftest:running-week-report
+npm run smoke:running-week-report
 npm run smoke:recommendation
 ```
 

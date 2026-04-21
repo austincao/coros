@@ -42,6 +42,9 @@
     "smoke:plan-flow": "node scripts/smoke-plan-flow.mjs",
     "smoke:activities": "node scripts/smoke-activities.mjs",
     "smoke:analysis": "node scripts/smoke-analysis.mjs",
+    "selftest:running-week-report": "node scripts/selftest-running-week-report.mjs",
+    "selftest:running-week-report:write-html": "RUNNING_WEEK_REPORT_HTML_OUT=tmp/running-week-report-sample.html node scripts/selftest-running-week-report.mjs",
+    "smoke:running-week-report": "node scripts/smoke-running-week-report.mjs",
     "smoke:recommendation": "node scripts/smoke-recommendation.mjs"
   },
   "dependencies": {

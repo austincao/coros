@@ -270,6 +270,31 @@ export async function startServer() {
   );
 
   server.registerTool(
+    "coros_running_week_report",
+    {
+      title: "COROS Running Week Report",
+      description:
+        "Running-only 7-day report: chart-oriented offline HTML plus structured metrics (uses the same run labels as coros_analyze_recent_week)",
+      inputSchema: {
+        end_day: z.string().regex(/^\d{8}$/).optional(),
+        include_html: z.boolean().optional(),
+        max_activity_details: z.number().int().positive().max(80).optional(),
+        raw: z.boolean().optional(),
+      },
+    },
+    async (input) => {
+      const result = await tools.coros_running_week_report.handler({
+        ...input,
+        end_day: input.end_day as `${number}` | undefined,
+      });
+      if (isFailure(result)) {
+        return failureResponse(result);
+      }
+      return successResponse(result.data);
+    },
+  );
+
+  server.registerTool(
     "coros_recommend_next_week",
     {
       title: "COROS Recommend Next Week",

@@ -1,6 +1,5 @@
 import type {
   ActivityDetailOutput,
-  ActivityListItem,
   AnalyzeActivityInput,
   AnalyzeActivityOutput,
   AnalyzeRecentWeekInput,
@@ -8,10 +7,14 @@ import type {
   AnalyzeTrainingBalanceInput,
   AnalyzeTrainingBalanceOutput,
   CorosDate,
+  RunningWeekReportInput,
+  RunningWeekReportOutput,
   ToolResult,
 } from "../types.js";
+import { classifyRun, isHikeSport, isRunSport, isStrengthSport } from "../activity-classification.js";
 import { ActivityService } from "./activity-service.js";
 import { ProfileService } from "./profile-service.js";
+import { buildRunningWeekReport } from "../report/running-week-report-builder.js";
 
 function formatLocalCorosDate(date: Date): CorosDate {
   const year = date.getFullYear();
@@ -37,39 +40,6 @@ function addDays(date: Date, days: number): Date {
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
-}
-
-function isRunSport(sportType: number) {
-  return sportType === 100 || sportType === 101;
-}
-
-function isStrengthSport(sportType: number) {
-  return sportType === 402;
-}
-
-function isHikeSport(sportType: number) {
-  return sportType === 104;
-}
-
-function classifyRun(
-  activity: Pick<ActivityListItem, "distance_km" | "training_load" | "avg_hr" | "pace_sec_per_km">,
-  lthr: number,
-) {
-  const distance = activity.distance_km;
-  const hr = activity.avg_hr;
-  const tl = activity.training_load;
-  const pace = activity.pace_sec_per_km;
-  const tlPerKm = distance > 0 ? tl / distance : 0;
-
-  if (distance >= 12 || tl >= 140) {
-    return "long";
-  }
-
-  if ((hr >= lthr - 15 && tlPerKm >= 12) || (pace !== undefined && pace <= 330 && tl >= 90)) {
-    return "quality";
-  }
-
-  return "easy";
 }
 
 function formatPace(pace?: number) {
@@ -441,5 +411,11 @@ export class AnalysisService {
         suggestions,
       },
     };
+  }
+
+  async runningWeekReport(
+    input: RunningWeekReportInput,
+  ): Promise<ToolResult<RunningWeekReportOutput>> {
+    return buildRunningWeekReport(this.activityService, this.profileService, input);
   }
 }

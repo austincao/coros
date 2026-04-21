@@ -2,6 +2,7 @@
 import process from "node:process";
 import { EnvSessionProvider } from "./auth/session.js";
 import { runBrowserLogin } from "./auth/browser-login.js";
+import { runHeadlessLogin } from "./auth/headless-login.js";
 import { startServer } from "./server.js";
 
 function printHelp() {
@@ -9,7 +10,7 @@ function printHelp() {
 
 Usage:
   coros-mcp-server serve
-  coros-mcp-server auth login
+  coros-mcp-server auth login [--headless]
   coros-mcp-server auth status
   coros-mcp-server auth clear
 
@@ -49,7 +50,11 @@ async function main() {
 
   switch (subcommand) {
     case "login":
-      await runBrowserLogin();
+      if (args.includes("--headless")) {
+        await runHeadlessLogin();
+      } else {
+        await runBrowserLogin();
+      }
       return;
     case "status":
       await printResult(await provider.getAuthStatus(), true);
