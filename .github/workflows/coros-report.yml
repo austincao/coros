@@ -36,6 +36,7 @@ jobs:
           npx playwright install chromium --with-deps
 
       - name: COROS Headless Login
+        timeout-minutes: 2
         run: |
           cd coros-mcp-server
           # 使用 --headless 登录并将 session 保存到默认路径
@@ -44,6 +45,14 @@ jobs:
           COROS_ACCOUNT: ${{ secrets.COROS_ACCOUNT }}
           COROS_PASSWORD: ${{ secrets.COROS_PASSWORD }}
           CHROME_EXECUTABLE_PATH: google-chrome
+
+      - name: Upload Login Debug Screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-debug-screenshot
+          path: coros-mcp-server/login-timeout-debug.png
+          if-no-files-found: ignore
 
       - name: Generate and Deliver Report
         run: |

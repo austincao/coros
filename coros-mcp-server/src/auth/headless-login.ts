@@ -43,13 +43,17 @@ export async function runHeadlessLogin(account?: string, password?: string) {
     // Password input has type password
     
     console.log("Filling login form...");
-    await page.fill('input[type="text"], input[placeholder*="账号"], input[placeholder*="Email"]', user);
+    await page.fill('input[placeholder*="手机号"], input[placeholder*="邮箱"], input[placeholder*="Email"], input[type="text"]', user);
     await page.fill('input[type="password"]', pass);
     
-    // Check if there is a "Keep me logged in" checkbox and check it if needed
+    // Check privacy policy if it exists and is not checked
+    const privacyCheckbox = page.locator('input[type="checkbox"], .ant-checkbox-input').last();
+    if (await privacyCheckbox.isVisible()) {
+      console.log("Checking privacy policy...");
+      await privacyCheckbox.check({ force: true });
+    }
     
     console.log("Submitting...");
-    // Find the login button - usually a button with "登录" or "Login" text, or type submit
     const loginButton = page.locator('button:has-text("登录"), button:has-text("Login"), button[type="submit"]');
     await loginButton.click();
 
@@ -57,7 +61,7 @@ export async function runHeadlessLogin(account?: string, password?: string) {
     console.log("Waiting for authentication...");
     
     let tokenValue: string | null = null;
-    const deadline = Date.now() + 30000; // 30 seconds timeout
+    const deadline = Date.now() + 45000; // Increased to 45 seconds
     
     while (Date.now() < deadline) {
       const cookies = await context.cookies([
@@ -70,13 +74,23 @@ export async function runHeadlessLogin(account?: string, password?: string) {
         tokenValue = tokenCookie.value;
         break;
       }
-      await page.waitForTimeout(1000);
+      
+      // Check for visible error messages on the page
+      const errorText = await page.innerText(".ant-message-notice-content, .error-message, .message-error").catch(() => null);
+      if (errorText) {
+        throw new Error(`Login failed: ${errorText}`);
+      }
+      
+      await page.waitForTimeout(2000);
     }
 
     if (!tokenValue) {
-      // Check if there is an error message on the page
-      const errorText = await page.innerText('.error-message, .message-error').catch(() => null);
-      throw new Error(`Failed to get COROS token. ${errorText ? `Page says: ${errorText}` : "Timed out."}`);
+      // Take a screenshot for debugging if running in a supported environment
+      if (process.env.GITHUB_ACTIONS) {
+        await page.screenshot({ path: "login-timeout-debug.png", fullPage: true });
+        console.log("Screenshot saved to login-timeout-debug.png");
+      }
+      throw new Error(`Failed to get COROS token. Timed out. Final URL: ${page.url()}`);
     }
 
     console.log("Importing session...");
