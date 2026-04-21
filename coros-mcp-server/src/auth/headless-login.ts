@@ -51,15 +51,25 @@ export async function runHeadlessLogin(account?: string, password?: string) {
     await page.waitForTimeout(500);
     
     // Check privacy policy
-    console.log("Looking for privacy policy checkbox...");
-    const privacyArea = page.locator('span:has-text("我已阅读并同意"), .ant-checkbox-wrapper').last();
+    console.log("Locating privacy policy checkbox...");
+    // Support both Chinese and English text, and also fallback to the last checkbox wrapper
+    const privacyArea = page.locator('span:has-text("我已阅读并同意"), span:has-text("I have read and agree"), .ant-checkbox-wrapper').last();
+    
     if (await privacyArea.isVisible()) {
-      console.log("Checking privacy policy via click...");
-      await privacyArea.click({ force: true });
-      await page.waitForTimeout(500);
+      const isChecked = await privacyArea.locator('.ant-checkbox-checked').isVisible();
+      if (!isChecked) {
+        console.log("Privacy policy not checked. Clicking it now...");
+        await privacyArea.click({ force: true });
+        // Small wait to ensure state update
+        await page.waitForTimeout(1000);
+      } else {
+        console.log("Privacy policy already checked.");
+      }
+    } else {
+      console.log("Warning: Privacy policy area not found, proceeding anyway...");
     }
     
-    console.log("Submitting login form...");
+    console.log(">>> FINAL ATTEMPT: Submitting login form...");
     const loginButton = page.locator('.ant-btn-primary:has-text("登录"), .ant-btn-primary:has-text("Login"), button[type="submit"]').first();
     await loginButton.click();
 

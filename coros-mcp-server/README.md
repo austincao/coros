@@ -375,6 +375,15 @@ Verifies:
 - `coros_auth_status` succeeds
 - The tool returns structured metrics plus non-trivial `html`
 
+**Scheduled Feishu DM (card + HTML file)** — uses Beijing `end_day`, writes `~/coros-weekly-reports/running-week-YYYYMMDD.html`, then `lark-cli im +messages-send` to your `open_id` (interactive card first, file second). Requires COROS session, `lark-cli` on `PATH`, bot scope `im:message:send_as_bot`, and an existing bot↔you DM thread.
+
+```bash
+export LARK_DM_USER_ID="ou_xxxxxxxx"
+npm run report:weekly-feishu
+# HTML only, no Feishu:
+SKIP_LARK=1 npm run report:weekly-feishu
+```
+
 ### Recommendation
 
 ```bash
