@@ -125,16 +125,29 @@ function buildInteractiveCard(report) {
   };
 }
 
-function runLarkSend(args, label) {
+function runLarkSend(args, label, spawnOpts = {}) {
   const r = spawnSync("lark-cli", args, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    ...spawnOpts,
   });
   if (r.status !== 0) {
     const err = (r.stderr || r.stdout || "").trim() || `exit ${r.status}`;
     throw new Error(`lark-cli ${label} failed: ${err}`);
   }
   return (r.stdout || "").trim();
+}
+
+function larkFileRelativePath(filePath) {
+  const resolved = path.resolve(filePath);
+  const cwd = process.cwd();
+  let rel = path.relative(cwd, resolved);
+  if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) {
+    return { cwd, rel: rel.split(path.sep).join("/") };
+  }
+  const dir = path.dirname(resolved);
+  const base = path.basename(resolved);
+  return { cwd: dir, rel: `./${base}` };
 }
 
 async function main() {
@@ -220,9 +233,11 @@ async function main() {
     "card",
   );
 
+  const { cwd: fileCwd, rel: fileRel } = larkFileRelativePath(htmlPath);
   runLarkSend(
-    ["im", "+messages-send", "--as", "bot", "--user-id", userId, "--file", htmlPath, "--idempotency-key", idemFile],
+    ["im", "+messages-send", "--as", "bot", "--user-id", userId, "--file", fileRel, "--idempotency-key", idemFile],
     "file",
+    { cwd: fileCwd },
   );
 
   console.log(JSON.stringify({ ok: true, lark: "sent", user_id: userId }, null, 2));

@@ -39,6 +39,8 @@ async function getFeishuToken() {
 
 async function sendFeishuCard(token, receiveId, cardData) {
   const receiveIdType = process.env.FEISHU_RECEIVE_ID_TYPE || 'open_id';
+  console.log(`Attempting to send message to ${receiveIdType}: ${receiveId}`);
+  
   const response = await fetch(`https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=${receiveIdType}`, {
     method: "POST",
     headers: {
@@ -52,7 +54,10 @@ async function sendFeishuCard(token, receiveId, cardData) {
     }),
   });
   const data = await response.json();
-  if (data.code !== 0) throw new Error(`Failed to send Feishu message: ${data.msg}`);
+  if (data.code !== 0) {
+    console.error("Feishu API Error Details:", JSON.stringify(data, null, 2));
+    throw new Error(`Failed to send Feishu message: ${data.msg} (Code: ${data.code})`);
+  }
   return data;
 }
 

@@ -384,6 +384,13 @@ npm run report:weekly-feishu
 SKIP_LARK=1 npm run report:weekly-feishu
 ```
 
+Resend from an **existing** HTML file (parse embedded `REPORT`, then card + file; set `LARK_DM_USER_ID`):
+
+```bash
+export LARK_DM_USER_ID="ou_xxxxxxxx"
+npm run report:feishu-send-html -- tmp/smoke-running-week-report.html
+```
+
 ### Recommendation
 
 ```bash
