@@ -51,6 +51,7 @@ jobs:
           node scripts/deliver-feishu-report.mjs
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          QWEN_MODEL: ${{ secrets.QWEN_MODEL || 'tongyi-xiaomi-analysis-pro' }}
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           FEISHU_RECEIVE_ID: ${{ secrets.FEISHU_RECEIVE_ID }}
