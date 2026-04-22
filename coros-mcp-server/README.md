@@ -375,19 +375,21 @@ Verifies:
 - `coros_auth_status` succeeds
 - The tool returns structured metrics plus non-trivial `html`
 
-**Scheduled Feishu DM (card + HTML file)** — uses Beijing `end_day`, writes `~/coros-weekly-reports/running-week-YYYYMMDD.html`, then `lark-cli im +messages-send` to your `open_id` (interactive card first, file second). Requires COROS session, `lark-cli` on `PATH`, bot scope `im:message:send_as_bot`, and an existing bot↔you DM thread.
+**Scheduled Feishu DM (card + HTML file)** — uses Beijing `end_day`, writes `~/coros-weekly-reports/running-week-YYYYMMDD.html`, then `lark-cli im +messages-send` to your `open_id` (`LARK_DM_USER_ID` or default: `lark-cli auth status` → `userOpenId`). Requires COROS session, `lark-cli` on `PATH`, bot scope `im:message:send_as_bot`, user `auth login` for default recipient, and an existing bot↔you DM thread.
 
 ```bash
-export LARK_DM_USER_ID="ou_xxxxxxxx"
+# Optional: copy `.env.lark.local.example` → `.env.lark.local` with LARK_DM_USER_ID=ou_xxx, or export it, or rely on lark-cli auth login (send to self)
 npm run report:weekly-feishu
 # HTML only, no Feishu:
 SKIP_LARK=1 npm run report:weekly-feishu
 ```
 
-Resend from an **existing** HTML file (parse embedded `REPORT`, then card + file; set `LARK_DM_USER_ID`):
+Card **chart screenshots** (Playwright opens the HTML, screenshots 4 ECharts panels, uploads via bot, embeds `img` in the interactive card). Disable with `FEISHU_CARD_CHARTS=0`. Requires local Chrome (same as `auth:browser-login`) and `im:resource` (or equivalent) on the app.
+
+Resend from an **existing** HTML file (parse embedded `REPORT`, then card + file; `LARK_DM_USER_ID` optional if `lark-cli auth login` is active):
 
 ```bash
-export LARK_DM_USER_ID="ou_xxxxxxxx"
+# LARK_DM_USER_ID optional if lark-cli auth login is done (defaults to your userOpenId)
 npm run report:feishu-send-html -- tmp/smoke-running-week-report.html
 ```
 

@@ -1,6 +1,6 @@
 /**
  * 从已生成的周报 HTML 中解析内嵌的 REPORT JSON，向飞书私聊发送：
- *  1) 与 report:weekly-feishu 相同的交互卡片
+ *  1) 交互卡片（摘要，可选内嵌图表截图）
  *  2) HTML 文件附件
  *
  * 用法：
@@ -8,32 +8,25 @@
  *   node scripts/feishu-send-existing-html.mjs path/to/report.html
  *
  * 默认路径：tmp/smoke-running-week-report.html（相对 coros-mcp-server 根目录）
+ *
+ * FEISHU_CARD_CHARTS=0 — 跳过 Playwright 截图与卡片内嵌图（仅文字摘要）
+ *
+ * LARK_DM_USER_ID — 可选；省略时若已 lark-cli auth login，则默认发给自己（auth status 的 userOpenId）
  */
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import {
+  buildInteractiveCard,
+  prepareChartImagesForCard,
+  resolveLarkDmUserId,
+  shouldEmbedChartScreenshots,
+} from "./feishu-report-chart-assets.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
-
-function fmtCorosDate(d) {
-  const s = String(d);
-  if (s.length !== 8) {
-    return s;
-  }
-  return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-}
-
-function secToHrMin(sec) {
-  const m = Math.round(sec / 60);
-  if (m >= 60) {
-    const h = Math.floor(m / 60);
-    return `${h}h${m % 60}m`;
-  }
-  return `${m}min`;
-}
 
 function parseReportFromHtml(html) {
   const marker = "const REPORT = ";
@@ -86,54 +79,6 @@ function parseReportFromHtml(html) {
   throw new Error("REPORT JSON 未闭合");
 }
 
-function buildInteractiveCard(report) {
-  const z = report.hr_zones_seconds || {};
-  const zSum = ["z1", "z2", "z3", "z4", "z5"].reduce((s, k) => s + (z[k] || 0), 0);
-  const g = report.hr_time_groups_seconds || {};
-  const gSum = (g.aerobic_base || 0) + (g.threshold || 0) + (g.high_intensity || 0);
-  const te = report.training_effect;
-
-  const lines = [
-    `**统计周期** ${fmtCorosDate(report.date_from)} → ${fmtCorosDate(report.date_to)}`,
-    `**跑次** ${report.totals.run_count}　**距离** ${report.totals.distance_km} km　**负荷** ${report.totals.training_load}`,
-    `**课型（节数）** 轻松 ${report.intensity_counts.easy} · 质量 ${report.intensity_counts.quality} · 长距离 ${report.intensity_counts.long}`,
-  ];
-
-  if (zSum > 0) {
-    lines.push(
-      `**心率时间** Z1–Z5 合计 ${secToHrMin(zSum)}（Z1 ${secToHrMin(z.z1)} · Z2 ${secToHrMin(z.z2)} · Z3 ${secToHrMin(z.z3)} · Z4 ${secToHrMin(z.z4)} · Z5 ${secToHrMin(z.z5)}）`,
-    );
-  }
-  if (gSum > 0) {
-    lines.push(
-      `**强度结构** 有氧基础 ${secToHrMin(g.aerobic_base)} · 阈值/混氧 ${secToHrMin(g.threshold)} · 高强度 ${secToHrMin(g.high_intensity)}`,
-    );
-  }
-  if (te && te.sessions_count > 0) {
-    lines.push(`**COROS TE（${te.sessions_count} 场详情）** 有氧 ${te.aerobic_sum} · 无氧 ${te.anaerobic_sum}`);
-  }
-
-  lines.push(`**完整图表** 见下一条消息中的 HTML 附件（需联网打开以加载图表）。`);
-
-  return {
-    config: { wide_screen_mode: true },
-    header: {
-      template: "blue",
-      title: { tag: "plain_text", content: `跑步周报 · ${fmtCorosDate(report.date_to)}` },
-    },
-    elements: [
-      {
-        tag: "div",
-        text: { tag: "lark_md", content: lines.join("\n\n") },
-      },
-      {
-        tag: "note",
-        elements: [{ tag: "plain_text", content: `生成时间 ${report.generated_at || ""}` }],
-      },
-    ],
-  };
-}
-
 function runLarkSend(args, label, spawnOpts = {}) {
   const r = spawnSync("lark-cli", args, {
     encoding: "utf8",
@@ -161,10 +106,7 @@ function larkFileRelativePath(filePath) {
 }
 
 async function main() {
-  const userId = process.env.LARK_DM_USER_ID?.trim();
-  if (!userId) {
-    throw new Error("请设置环境变量 LARK_DM_USER_ID（飞书用户 open_id，ou_ 开头）");
-  }
+  const userId = resolveLarkDmUserId();
 
   const rel = process.argv[2] || "tmp/smoke-running-week-report.html";
   const htmlPath = path.isAbsolute(rel) ? rel : path.join(ROOT, rel);
@@ -174,7 +116,17 @@ async function main() {
     throw new Error("解析到的 REPORT 缺少 date_from / date_to");
   }
 
-  const card = buildInteractiveCard(report);
+  let chartImages = [];
+  if (shouldEmbedChartScreenshots()) {
+    try {
+      chartImages = await prepareChartImagesForCard(htmlPath, ROOT);
+      console.log(JSON.stringify({ chart_screenshots: chartImages.length }, null, 2));
+    } catch (e) {
+      console.warn("Feishu 卡片内嵌图表已跳过:", e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  const card = buildInteractiveCard(report, chartImages);
   const endDay = String(report.date_to);
   const idemSuffix = process.env.LARK_IDEM_SUFFIX?.trim() || "resend";
   const idemCard = `coros-running-week-card-${endDay}-${idemSuffix}`;
@@ -217,7 +169,7 @@ async function main() {
     { cwd: fileCwd },
   );
   console.log("file:", fileOut);
-  console.log(JSON.stringify({ ok: true, html_path: htmlPath }, null, 2));
+  console.log(JSON.stringify({ ok: true, html_path: htmlPath, chart_images: chartImages.length }, null, 2));
 }
 
 main().catch((e) => {
