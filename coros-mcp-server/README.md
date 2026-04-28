@@ -183,6 +183,15 @@ Use:
 
 `coros_auth_status` also validates the currently resolved token and reports whether it came from `env` or `session_file`.
 
+### GitHub Actions (`COROS Feishu Report` workflow)
+
+The scheduled job in `.github/workflows/coros-report.yml` can authenticate in two ways:
+
+1. **`COROS_ACCESS_TOKEN` repository secret (recommended)** — same value as the COROS web token (`CPL-coros-token`). When this secret is set, the workflow **skips** installing Playwright Chromium and **skips** headless browser login (faster, no stored password). Renew the secret when COROS expires the token.
+2. **No `COROS_ACCESS_TOKEN`** — falls back to `COROS_ACCOUNT` + `COROS_PASSWORD` and runs `auth login --headless` so the runner obtains a token and writes the default session file.
+
+The deliver script resolves auth like any other CLI run: env token first, then `session.json`.
+
 ## Quick Start
 
 Install dependencies:
@@ -384,7 +393,7 @@ npm run report:weekly-feishu
 SKIP_LARK=1 npm run report:weekly-feishu
 ```
 
-Card **chart screenshots** (Playwright opens the HTML, screenshots 4 ECharts panels, uploads via bot, embeds `img` in the interactive card). Disable with `FEISHU_CARD_CHARTS=0`. Requires local Chrome (same as `auth:browser-login`) and `im:resource` (or equivalent) on the app.
+Card **chart screenshots** (Playwright opens the HTML, screenshots 4 ECharts panels, uploads via bot). Images are embedded using Feishu **markdown** elements `![label](img_key)` (not `tag: img`, which often renders empty). Disable screenshots with `FEISHU_CARD_CHARTS=0`. If the card still shows no images in your client, set **`FEISHU_CHART_IMAGES_AS_MESSAGES=1`** to also send four standalone image messages after the card. Requires local Chrome (same as `auth:browser-login`) and bot image upload scope (e.g. `im:resource`).
 
 Resend from an **existing** HTML file (parse embedded `REPORT`, then card + file; `LARK_DM_USER_ID` optional if `lark-cli auth login` is active):
 

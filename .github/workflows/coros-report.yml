@@ -30,12 +30,24 @@ jobs:
           cd coros-mcp-server
           npm run build
 
+      - name: COROS auth mode
+        run: |
+          if [ -n "${COROS_ACCESS_TOKEN:-}" ]; then
+            echo "COROS auth: COROS_ACCESS_TOKEN secret is set → skip Chromium and headless login"
+          else
+            echo "COROS auth: COROS_ACCESS_TOKEN not set → install Chromium and run headless login"
+          fi
+        env:
+          COROS_ACCESS_TOKEN: ${{ secrets.COROS_ACCESS_TOKEN }}
+
       - name: Install Playwright Browsers
+        if: ${{ secrets.COROS_ACCESS_TOKEN == '' }}
         run: |
           cd coros-mcp-server
           npx playwright install chromium --with-deps
 
       - name: COROS Headless Login
+        if: ${{ secrets.COROS_ACCESS_TOKEN == '' }}
         timeout-minutes: 2
         run: |
           cd coros-mcp-server
@@ -59,6 +71,7 @@ jobs:
           cd coros-mcp-server
           node scripts/deliver-feishu-report.mjs
         env:
+          COROS_ACCESS_TOKEN: ${{ secrets.COROS_ACCESS_TOKEN }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           QWEN_MODEL: ${{ secrets.QWEN_MODEL || 'tongyi-xiaomi-analysis-pro' }}
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
