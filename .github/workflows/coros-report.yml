@@ -48,7 +48,8 @@ jobs:
         if: steps.coros-auth-plan.outputs.needs_playwright == 'true'
         run: |
           cd coros-mcp-server
-          npx playwright install chromium --with-deps
+          # Pin to the same major line as package.json `playwright-core` (mismatched CLI = missing browser path)
+          npx --yes playwright@1.59.1 install chromium --with-deps
 
       - name: COROS Headless Login
         if: steps.coros-auth-plan.outputs.needs_playwright == 'true'
@@ -60,7 +61,6 @@ jobs:
         env:
           COROS_ACCOUNT: ${{ secrets.COROS_ACCOUNT }}
           COROS_PASSWORD: ${{ secrets.COROS_PASSWORD }}
-          CHROME_EXECUTABLE_PATH: google-chrome
 
       - name: Upload Login Debug Screenshot
         if: failure()

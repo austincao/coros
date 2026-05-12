@@ -4,15 +4,6 @@ import { EnvSessionProvider } from "./session.js";
 const DEFAULT_LOGIN_URL = "https://t.coros.com/login?lastUrl=%2Fadmin%2Fviews%2Fdash-board";
 const DEFAULT_COOKIE_NAME = "CPL-coros-token";
 
-async function detectChromeExecutable() {
-  const explicit = process.env.CHROME_EXECUTABLE_PATH?.trim();
-  if (explicit) {
-    return explicit;
-  }
-  // Simplified for GitHub Actions (usually has 'google-chrome' or 'chromium' in path)
-  return "google-chrome"; 
-}
-
 export async function runHeadlessLogin(account?: string, password?: string) {
   const user = account || process.env.COROS_ACCOUNT;
   const pass = password || process.env.COROS_PASSWORD;
