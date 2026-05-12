@@ -192,6 +192,8 @@ The scheduled job in `.github/workflows/coros-report.yml` can authenticate in tw
 
 The deliver script resolves auth like any other CLI run: env token first, then `session.json`.
 
+Implementation note: **step `if:` expressions cannot use the `secrets` context** on GitHub, so the workflow uses a short “auth plan” step that receives the token only in `env`, then writes `needs_playwright` to `GITHUB_OUTPUT`; Playwright + headless login run only when `needs_playwright=true`.
+
 ## Quick Start
 
 Install dependencies:

@@ -30,24 +30,28 @@ jobs:
           cd coros-mcp-server
           npm run build
 
-      - name: COROS auth mode
-        run: |
-          if [ -n "${COROS_ACCESS_TOKEN:-}" ]; then
-            echo "COROS auth: COROS_ACCESS_TOKEN secret is set → skip Chromium and headless login"
-          else
-            echo "COROS auth: COROS_ACCESS_TOKEN not set → install Chromium and run headless login"
-          fi
+      # Cannot use secrets.* inside step-level `if:` (workflow parse fails). Derive booleans via env here.
+      - id: coros-auth-plan
+        name: COROS auth plan
         env:
           COROS_ACCESS_TOKEN: ${{ secrets.COROS_ACCESS_TOKEN }}
+        run: |
+          if [ -n "${COROS_ACCESS_TOKEN:-}" ]; then
+            echo "needs_playwright=false" >> "$GITHUB_OUTPUT"
+            echo "COROS auth: COROS_ACCESS_TOKEN secret is set → skip Chromium and headless login"
+          else
+            echo "needs_playwright=true" >> "$GITHUB_OUTPUT"
+            echo "COROS auth: COROS_ACCESS_TOKEN not set → install Chromium and run headless login"
+          fi
 
       - name: Install Playwright Browsers
-        if: ${{ secrets.COROS_ACCESS_TOKEN == '' }}
+        if: steps.coros-auth-plan.outputs.needs_playwright == 'true'
         run: |
           cd coros-mcp-server
           npx playwright install chromium --with-deps
 
       - name: COROS Headless Login
-        if: ${{ secrets.COROS_ACCESS_TOKEN == '' }}
+        if: steps.coros-auth-plan.outputs.needs_playwright == 'true'
         timeout-minutes: 2
         run: |
           cd coros-mcp-server
