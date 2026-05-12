@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { chromium } from "playwright-core";
 import { EnvSessionProvider } from "./session.js";
+import { corosCookieSettleDelayMs } from "../config/coros-env.js";
 
 const DEFAULT_LOGIN_URL = "https://t.coros.com/login?lastUrl=%2Fadmin%2Fviews%2Fdash-board";
 const DEFAULT_COOKIE_NAME = "CPL-coros-token";
@@ -118,7 +119,7 @@ async function waitForCorosCookie(
 export async function runBrowserLogin() {
   const executablePath = await detectChromeExecutable();
   const userDataDir = browserProfileDir();
-  const sessionProvider = new EnvSessionProvider("https://teamcnapi.coros.com");
+  const sessionProvider = new EnvSessionProvider();
   const cookieName = process.env.COROS_COOKIE_NAME?.trim() || DEFAULT_COOKIE_NAME;
   const deadline = Date.now() + timeoutMs();
 
@@ -142,6 +143,8 @@ export async function runBrowserLogin() {
     if (!result) {
       throw new Error(`Timed out waiting for ${cookieName}. Finish login and retry.`);
     }
+
+    await page.waitForTimeout(corosCookieSettleDelayMs());
 
     const imported = await sessionProvider.importFromCookieHeader(result.cookieHeader, cookieName, true);
     if (!imported.ok) {

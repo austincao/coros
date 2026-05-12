@@ -46,7 +46,7 @@ async function main() {
     process.exit(1);
   }
 
-  const provider = new EnvSessionProvider("https://teamcnapi.coros.com");
+  const provider = new EnvSessionProvider();
 
   switch (subcommand) {
     case "login":

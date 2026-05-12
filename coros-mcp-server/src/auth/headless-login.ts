@@ -20,7 +20,7 @@ export async function runHeadlessLogin(account?: string, password?: string) {
     viewport: { width: 1440, height: 960 },
   });
 
-  const sessionProvider = new EnvSessionProvider("https://teamcnapi.coros.com");
+  const sessionProvider = new EnvSessionProvider();
   const cookieName = process.env.COROS_COOKIE_NAME?.trim() || DEFAULT_COOKIE_NAME;
 
   try {

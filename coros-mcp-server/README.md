@@ -170,7 +170,13 @@ CHROME_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Ch
 COROS_BROWSER_PROFILE_DIR="$HOME/.config/coros-mcp/browser-profile"
 COROS_BROWSER_LOGIN_TIMEOUT_MS=600000
 COROS_SESSION_PATH="$HOME/.config/coros-mcp/session.json"
+COROS_COOKIE_SETTLE_MS=2500               # Wait after detecting CPL-coros-token before calling /account/query
+COROS_VALIDATE_RETRIES=6                # Retry count for token validation
+COROS_VALIDATE_RETRY_DELAY_MS=1200       # Pause between retries
+COROS_API_BASE="https://teamcnapi.coros.com"   # CN default; try https://teamapi.coros.com if validation always fails after login
 ```
+
+If the browser reaches the COROS dashboard but the helper fails with **`Access token is invalid`**, that almost always means `GET COROS_API_BASE/account/query` did not accept `CPL-coros-token` yet (timing) — the defaults above mitigate that — or **the API origin does not match your account region** (`COROS_API_BASE`), or COROS rotated how cookies map to REST tokens. Check `CPL-coros-token` on `t.coros.com` in DevTools and confirm the cookie host matches your usual Training Hub entry.
 
 This is the recommended interactive path when you want the project to acquire and persist a fresh token without manually copying browser cookies.
 

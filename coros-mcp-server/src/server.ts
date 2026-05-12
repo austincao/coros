@@ -32,7 +32,7 @@ function successResponse<T>(data: T) {
 }
 
 export async function startServer() {
-  const sessionProvider = new EnvSessionProvider("https://teamcnapi.coros.com");
+  const sessionProvider = new EnvSessionProvider();
   const tools = createToolRegistry(sessionProvider);
 
   const server = new McpServer({

@@ -8,6 +8,11 @@ import type {
   SetAuthTokenOutput,
   ToolResult,
 } from "../types.js";
+import {
+  corosApiBaseUrl,
+  corosValidateRetryCount,
+  corosValidateRetryDelayMs,
+} from "../config/coros-env.js";
 
 export interface SessionProvider {
   getAccessToken(): Promise<string | null>;
@@ -97,18 +102,49 @@ function readCookieValue(cookieHeader: string, cookieName: string): string | nul
 
 export class EnvSessionProvider implements SessionProvider {
   private readonly sessionPath: string;
+  private readonly apiBaseUrl: string;
 
   constructor(
-    private readonly baseUrl: string,
+    explicitBaseUrl?: string,
     private readonly envVarName = "COROS_ACCESS_TOKEN",
     sessionPath = process.env.COROS_SESSION_PATH?.trim() || defaultSessionPath(),
   ) {
     this.sessionPath = sessionPath;
+    this.apiBaseUrl = (explicitBaseUrl ?? corosApiBaseUrl()).replace(/\/+$/, "");
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, ms);
+    });
   }
 
   private async validateToken(token: string): Promise<ToolResult<ValidationSuccess>> {
+    const attempts = corosValidateRetryCount();
+    const pauseMs = corosValidateRetryDelayMs();
+    let last: ToolResult<ValidationSuccess> = {
+      ok: false,
+      error: {
+        code: "TOKEN_INVALID",
+        message: "COROS token validation did not complete",
+      },
+    };
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      last = await this.validateTokenOnce(token);
+      if (last.ok) {
+        return last;
+      }
+      if (attempt < attempts) {
+        await this.sleep(pauseMs);
+      }
+    }
+    return last;
+  }
+
+  private async validateTokenOnce(token: string): Promise<ToolResult<ValidationSuccess>> {
     try {
-      const response = await fetch(`${this.baseUrl}/account/query`, {
+      const response = await fetch(`${this.apiBaseUrl}/account/query`, {
         method: "GET",
         headers: {
           accessToken: token,
