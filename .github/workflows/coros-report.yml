@@ -2,7 +2,8 @@ name: COROS Feishu Report
 
 on:
   schedule:
-    - cron: '0 1 * * 3,0' # 周三和周日 北京时间 09:00 (UTC 01:00)
+    # Daily trigger as a reliability fallback; we gate actual execution below.
+    - cron: '0 1 * * *' # 北京时间 09:00 (UTC 01:00)
   workflow_dispatch:      # 支持手动触发
 
 jobs:
@@ -30,9 +31,32 @@ jobs:
           cd coros-mcp-server
           npm run build
 
+      - id: run-window
+        name: Resolve schedule run window (Asia/Shanghai)
+        run: |
+          DOW=$(TZ=Asia/Shanghai date +%u) # 1..7 (Mon..Sun)
+          NOW=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S %Z')
+          echo "Heartbeat: event=${{ github.event_name }}, run_id=${{ github.run_id }}, now=${NOW}, dow=${DOW}"
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "reason=non-schedule event" >> "$GITHUB_OUTPUT"
+          elif [ "$DOW" = "3" ] || [ "$DOW" = "7" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "reason=schedule on Wed/Sun" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "reason=schedule outside Wed/Sun" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Heartbeat summary
+        run: |
+          echo "should_run=${{ steps.run-window.outputs.should_run }}"
+          echo "reason=${{ steps.run-window.outputs.reason }}"
+
       # Cannot use secrets.* inside step-level `if:` (workflow parse fails). Derive booleans via env here.
       - id: coros-auth-plan
         name: COROS auth plan
+        if: steps.run-window.outputs.should_run == 'true'
         env:
           COROS_ACCESS_TOKEN: ${{ secrets.COROS_ACCESS_TOKEN }}
         run: |
@@ -45,14 +69,14 @@ jobs:
           fi
 
       - name: Install Playwright Browsers
-        if: steps.coros-auth-plan.outputs.needs_playwright == 'true'
+        if: steps.run-window.outputs.should_run == 'true' && steps.coros-auth-plan.outputs.needs_playwright == 'true'
         run: |
           cd coros-mcp-server
           # Pin to the same major line as package.json `playwright-core` (mismatched CLI = missing browser path)
           npx --yes playwright@1.59.1 install chromium --with-deps
 
       - name: COROS Headless Login
-        if: steps.coros-auth-plan.outputs.needs_playwright == 'true'
+        if: steps.run-window.outputs.should_run == 'true' && steps.coros-auth-plan.outputs.needs_playwright == 'true'
         timeout-minutes: 2
         run: |
           cd coros-mcp-server
@@ -63,7 +87,7 @@ jobs:
           COROS_PASSWORD: ${{ secrets.COROS_PASSWORD }}
 
       - name: Upload Login Debug Screenshot
-        if: failure()
+        if: steps.run-window.outputs.should_run == 'true' && failure()
         uses: actions/upload-artifact@v4
         with:
           name: login-debug-screenshot
@@ -71,6 +95,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Generate and Deliver Report
+        if: steps.run-window.outputs.should_run == 'true'
         run: |
           cd coros-mcp-server
           node scripts/deliver-feishu-report.mjs
@@ -84,7 +109,7 @@ jobs:
           FEISHU_RECEIVE_ID_TYPE: ${{ secrets.FEISHU_RECEIVE_ID_TYPE || 'open_id' }}
 
       - name: Notify Failure
-        if: failure()
+        if: steps.run-window.outputs.should_run == 'true' && failure()
         run: |
           cd coros-mcp-server
           # 简单的失败通知逻辑可以写在这里，或者调用一个专门的脚本
