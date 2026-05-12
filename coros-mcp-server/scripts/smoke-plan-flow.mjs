@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { mcpChildEnv } from "./lib/mcp-child-env.mjs";
 
 function formatCorosDate(date) {
   const year = date.getUTCFullYear();
@@ -53,10 +54,7 @@ async function main() {
     command: "node",
     args: ["dist/index.js"],
     cwd: process.cwd(),
-    env: {
-      ...process.env,
-      COROS_ACCESS_TOKEN: process.env.COROS_ACCESS_TOKEN,
-    },
+    env: mcpChildEnv(),
     stderr: "pipe",
   });
 

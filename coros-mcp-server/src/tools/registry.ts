@@ -19,7 +19,6 @@ import type {
   ValidatePlanDatesInput,
 } from "../types.js";
 import type { SessionProvider } from "../auth/session.js";
-import { corosApiBaseUrl } from "../config/coros-env.js";
 import { ActivityService } from "../services/activity-service.js";
 import { AnalysisService } from "../services/analysis-service.js";
 import { CorosClient } from "../client/coros-client.js";
@@ -38,8 +37,10 @@ export interface ToolDefinition<TInput, TOutput> {
 }
 
 export function createToolRegistry(sessionProvider: SessionProvider) {
-  const corosBaseUrl = corosApiBaseUrl();
-  const corosClient = new CorosClient(corosBaseUrl, () => sessionProvider.getAccessToken());
+  const corosClient = new CorosClient(
+    () => sessionProvider.getCorosApiOrigin(),
+    () => sessionProvider.getAccessToken(),
+  );
   const activityService = new ActivityService(corosClient);
   const profileService = new ProfileService(sessionProvider, corosClient);
   const analysisService = new AnalysisService(activityService, profileService);

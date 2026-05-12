@@ -23,7 +23,7 @@ function buildUrl(
 
 export class CorosClient {
   constructor(
-    private readonly baseUrl: string,
+    private readonly getBaseUrl: () => Promise<string>,
     private readonly getAccessToken: () => Promise<string | null>,
   ) {}
 
@@ -33,7 +33,8 @@ export class CorosClient {
       throw new Error("AUTH_REQUIRED");
     }
 
-    const response = await fetch(buildUrl(this.baseUrl, options.path, options.query), {
+    const baseUrl = (await this.getBaseUrl()).replace(/\/+$/, "");
+    const response = await fetch(buildUrl(baseUrl, options.path, options.query), {
       method: options.method,
       headers: {
         accessToken: token,

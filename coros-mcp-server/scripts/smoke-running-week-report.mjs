@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { mcpChildEnv } from "./lib/mcp-child-env.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -37,9 +38,7 @@ async function main() {
     command: "node",
     args: ["dist/index.js"],
     cwd: ROOT,
-    env: {
-      ...process.env,
-    },
+    env: mcpChildEnv(),
     stderr: "pipe",
   });
 

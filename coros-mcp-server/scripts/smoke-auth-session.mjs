@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { mcpChildEnv } from "./lib/mcp-child-env.mjs";
 
 function parseToolText(result) {
   const textItem = Array.isArray(result.content)
@@ -37,11 +38,11 @@ async function main() {
     command: "node",
     args: ["dist/index.js"],
     cwd: process.cwd(),
-    env: {
+    env: mcpChildEnv({
       ...process.env,
       COROS_ACCESS_TOKEN: "",
       COROS_SESSION_PATH: sessionPath,
-    },
+    }),
     stderr: "pipe",
   });
 

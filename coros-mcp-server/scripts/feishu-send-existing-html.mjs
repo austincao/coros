@@ -10,6 +10,7 @@
  * 默认路径：tmp/smoke-running-week-report.html（相对 coros-mcp-server 根目录）
  *
  * FEISHU_CARD_CHARTS=0 — 跳过 Playwright 截图与卡片内嵌图（仅文字摘要）
+ * FEISHU_CHART_IMAGES_AS_MESSAGES=1 — 卡片发出后，再发 4 条图片消息（聊天记录必有图；与卡片内图可能重复）
  *
  * LARK_DM_USER_ID — 可选；省略时若已 lark-cli auth login，则默认发给自己（auth status 的 userOpenId）
  */
@@ -20,9 +21,11 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   buildInteractiveCard,
-  prepareChartImagesForCard,
+  cleanupChartTempDir,
+  prepareChartImagesWithLocalPaths,
   resolveLarkDmUserId,
   shouldEmbedChartScreenshots,
+  shouldSendChartImagesAsSeparateMessages,
 } from "./feishu-report-chart-assets.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -116,60 +119,110 @@ async function main() {
     throw new Error("解析到的 REPORT 缺少 date_from / date_to");
   }
 
-  let chartImages = [];
+  let tmpDir = null;
+  let chartRows = [];
   if (shouldEmbedChartScreenshots()) {
     try {
-      chartImages = await prepareChartImagesForCard(htmlPath, ROOT);
-      console.log(JSON.stringify({ chart_screenshots: chartImages.length }, null, 2));
+      const prep = await prepareChartImagesWithLocalPaths(htmlPath, ROOT);
+      chartRows = prep.items;
+      tmpDir = prep.tmpDir;
+      console.error(
+        JSON.stringify({
+          feishu_chart_pngs: chartRows.length,
+          img_keys: chartRows.map((r) => r.img_key),
+        }),
+      );
     } catch (e) {
-      console.warn("Feishu 卡片内嵌图表已跳过:", e instanceof Error ? e.message : String(e));
+      console.warn("Feishu 图表截图/上传已跳过:", e instanceof Error ? e.message : String(e));
     }
   }
 
+  const chartImages = chartRows.map(({ label, img_key }) => ({ label, img_key }));
   const card = buildInteractiveCard(report, chartImages);
   const endDay = String(report.date_to);
   const idemSuffix = process.env.LARK_IDEM_SUFFIX?.trim() || "resend";
   const idemCard = `coros-running-week-card-${endDay}-${idemSuffix}`;
   const idemFile = `coros-running-week-file-${endDay}-${idemSuffix}`;
 
-  const cardOut = runLarkSend(
-    [
-      "im",
-      "+messages-send",
-      "--as",
-      "bot",
-      "--user-id",
-      userId,
-      "--msg-type",
-      "interactive",
-      "--content",
-      JSON.stringify(card),
-      "--idempotency-key",
-      idemCard,
-    ],
-    "card",
-  );
-  console.log("card:", cardOut);
+  try {
+    const cardOut = runLarkSend(
+      [
+        "im",
+        "+messages-send",
+        "--as",
+        "bot",
+        "--user-id",
+        userId,
+        "--msg-type",
+        "interactive",
+        "--content",
+        JSON.stringify(card),
+        "--idempotency-key",
+        idemCard,
+      ],
+      "card",
+    );
+    console.log("card:", cardOut);
 
-  const { cwd: fileCwd, rel: fileRel } = larkFileRelativePath(htmlPath);
-  const fileOut = runLarkSend(
-    [
-      "im",
-      "+messages-send",
-      "--as",
-      "bot",
-      "--user-id",
-      userId,
-      "--file",
-      fileRel,
-      "--idempotency-key",
-      idemFile,
-    ],
-    "file",
-    { cwd: fileCwd },
-  );
-  console.log("file:", fileOut);
-  console.log(JSON.stringify({ ok: true, html_path: htmlPath, chart_images: chartImages.length }, null, 2));
+    if (shouldSendChartImagesAsSeparateMessages() && chartRows.length > 0) {
+      for (let i = 0; i < chartRows.length; i += 1) {
+        const row = chartRows[i];
+        const { cwd: imgCwd, rel: imgRel } = larkFileRelativePath(row.localPath);
+        const imgOut = runLarkSend(
+          [
+            "im",
+            "+messages-send",
+            "--as",
+            "bot",
+            "--user-id",
+            userId,
+            "--image",
+            imgRel,
+            "--idempotency-key",
+            `${idemFile}-png${i}`,
+          ],
+          `chart-png-${i}`,
+          { cwd: imgCwd },
+        );
+        console.log(`chart-png-${i}:`, imgOut);
+      }
+    }
+
+    const { cwd: fileCwd, rel: fileRel } = larkFileRelativePath(htmlPath);
+    const fileOut = runLarkSend(
+      [
+        "im",
+        "+messages-send",
+        "--as",
+        "bot",
+        "--user-id",
+        userId,
+        "--file",
+        fileRel,
+        "--idempotency-key",
+        idemFile,
+      ],
+      "file",
+      { cwd: fileCwd },
+    );
+    console.log("file:", fileOut);
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          html_path: htmlPath,
+          chart_images: chartImages.length,
+          separate_png_messages: shouldSendChartImagesAsSeparateMessages() ? chartRows.length : 0,
+        },
+        null,
+        2,
+      ),
+    );
+  } finally {
+    if (tmpDir) {
+      await cleanupChartTempDir(tmpDir);
+    }
+  }
 }
 
 main().catch((e) => {

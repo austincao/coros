@@ -173,10 +173,14 @@ COROS_SESSION_PATH="$HOME/.config/coros-mcp/session.json"
 COROS_COOKIE_SETTLE_MS=2500               # Wait after detecting CPL-coros-token before calling /account/query
 COROS_VALIDATE_RETRIES=6                # Retry count for token validation
 COROS_VALIDATE_RETRY_DELAY_MS=1200       # Pause between retries
-COROS_API_BASE="https://teamcnapi.coros.com"   # CN default; try https://teamapi.coros.com if validation always fails after login
+COROS_INTL_API=1                         # Optional: international Training Hub → REST host https://teamapi.coros.com (omit for mainland default teamcnapi)
 ```
 
-If the browser reaches the COROS dashboard but the helper fails with **`Access token is invalid`**, that almost always means `GET COROS_API_BASE/account/query` did not accept `CPL-coros-token` yet (timing) — the defaults above mitigate that — or **the API origin does not match your account region** (`COROS_API_BASE`), or COROS rotated how cookies map to REST tokens. Check `CPL-coros-token` on `t.coros.com` in DevTools and confirm the cookie host matches your usual Training Hub entry.
+API host selection is **not** done with `COROS_API_BASE` (removed): defaults follow mainland (`https://teamcnapi.coros.com`); set `COROS_INTL_API=1` only if your account uses the international stack.
+
+If the browser reaches the COROS dashboard but the helper fails with **`Access token is invalid`**, that often means `GET …/account/query` did not accept `CPL-coros-token` yet (timing) — the defaults above mitigate that — or **the REST region does not match your account** (wrong `COROS_INTL_API`), or COROS rotated how cookies map to REST tokens. Check `CPL-coros-token` on `t.coros.com` in DevTools and confirm the cookie host matches your usual Training Hub entry.
+
+Scripts that spawn the MCP server import `scripts/lib/mcp-child-env.mjs` so a stray `COROS_API_BASE` in your shell cannot override the defaults.
 
 This is the recommended interactive path when you want the project to acquire and persist a fresh token without manually copying browser cookies.
 

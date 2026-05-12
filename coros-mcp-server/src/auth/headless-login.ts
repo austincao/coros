@@ -1,5 +1,7 @@
 import { chromium } from "playwright-core";
 import { EnvSessionProvider } from "./session.js";
+import { corosCookieSettleDelayMs } from "../config/coros-env.js";
+import { attachCorosLoginAccessTokenCapture } from "./coros-login-capture.js";
 
 const DEFAULT_LOGIN_URL = "https://t.coros.com/login?lastUrl=%2Fadmin%2Fviews%2Fdash-board";
 const DEFAULT_COOKIE_NAME = "CPL-coros-token";
@@ -23,8 +25,10 @@ export async function runHeadlessLogin(account?: string, password?: string) {
   const sessionProvider = new EnvSessionProvider();
   const cookieName = process.env.COROS_COOKIE_NAME?.trim() || DEFAULT_COOKIE_NAME;
 
+  let capture: ReturnType<typeof attachCorosLoginAccessTokenCapture> | undefined;
   try {
     const page = await context.newPage();
+    capture = attachCorosLoginAccessTokenCapture(page);
     console.log(`Navigating to ${DEFAULT_LOGIN_URL}...`);
     await page.goto(DEFAULT_LOGIN_URL, { waitUntil: "networkidle" });
 
@@ -81,9 +85,17 @@ export async function runHeadlessLogin(account?: string, password?: string) {
       const cookies = await context.cookies([
         "https://t.coros.com",
         "https://www.coros.com",
+        "https://training.coros.com",
         "https://teamcnapi.coros.com",
+        "https://teamapi.coros.com",
       ]);
       const tokenCookie = cookies.find((c) => c.name === cookieName);
+      const fromApi = capture.getCaptured();
+      if (fromApi) {
+        console.log("Access token captured from login API response.");
+        tokenValue = fromApi;
+        break;
+      }
       if (tokenCookie?.value) {
         console.log("Token found in cookies!");
         tokenValue = tokenCookie.value;
@@ -115,6 +127,8 @@ export async function runHeadlessLogin(account?: string, password?: string) {
       throw new Error(`Failed to get COROS token. Timed out. Final URL: ${page.url()}`);
     }
 
+    await page.waitForTimeout(corosCookieSettleDelayMs());
+
     console.log("Importing session...");
     const imported = await sessionProvider.setAccessToken(tokenValue, true);
     if (!imported.ok) {
@@ -124,6 +138,7 @@ export async function runHeadlessLogin(account?: string, password?: string) {
     console.log("Login successful!");
     return imported.data;
   } finally {
+    capture?.dispose();
     await browser.close();
   }
 }

@@ -10,12 +10,14 @@ import type {
 } from "../types.js";
 import {
   corosApiBaseUrl,
+  corosAccountQueryBases,
   corosValidateRetryCount,
   corosValidateRetryDelayMs,
 } from "../config/coros-env.js";
 
 export interface SessionProvider {
   getAccessToken(): Promise<string | null>;
+  getCorosApiOrigin(): Promise<string>;
   getAuthStatus(): Promise<ToolResult<AuthStatus>>;
   setAccessToken(token: string, validate?: boolean): Promise<ToolResult<SetAuthTokenOutput>>;
   importFromCookieHeader(
@@ -46,6 +48,8 @@ interface StoredSession {
   user_id?: string;
   nickname?: string;
   region?: number;
+  /** Host that last accepted this token for /account/query (e.g. https://teamapi.coros.com). */
+  api_base?: string;
 }
 
 interface ValidationSuccess {
@@ -74,6 +78,7 @@ async function readStoredSession(sessionPath: string): Promise<StoredSession | n
       user_id: typeof parsed.user_id === "string" ? parsed.user_id : undefined,
       nickname: typeof parsed.nickname === "string" ? parsed.nickname : undefined,
       region: typeof parsed.region === "number" ? parsed.region : undefined,
+      api_base: typeof parsed.api_base === "string" ? parsed.api_base.trim() : undefined,
     };
   } catch {
     return null;
@@ -103,6 +108,8 @@ function readCookieValue(cookieHeader: string, cookieName: string): string | nul
 export class EnvSessionProvider implements SessionProvider {
   private readonly sessionPath: string;
   private readonly apiBaseUrl: string;
+  /** Base URL that last succeeded for validateToken (used as api_base in session file). */
+  private resolvedValidationBase: string | null = null;
 
   constructor(
     explicitBaseUrl?: string,
@@ -122,6 +129,8 @@ export class EnvSessionProvider implements SessionProvider {
   private async validateToken(token: string): Promise<ToolResult<ValidationSuccess>> {
     const attempts = corosValidateRetryCount();
     const pauseMs = corosValidateRetryDelayMs();
+    const bases = corosAccountQueryBases();
+    this.resolvedValidationBase = null;
     let last: ToolResult<ValidationSuccess> = {
       ok: false,
       error: {
@@ -131,9 +140,12 @@ export class EnvSessionProvider implements SessionProvider {
     };
 
     for (let attempt = 1; attempt <= attempts; attempt++) {
-      last = await this.validateTokenOnce(token);
-      if (last.ok) {
-        return last;
+      for (const base of bases) {
+        last = await this.tryValidateAt(base, token);
+        if (last.ok) {
+          this.resolvedValidationBase = base.replace(/\/+$/, "");
+          return last;
+        }
       }
       if (attempt < attempts) {
         await this.sleep(pauseMs);
@@ -142,9 +154,9 @@ export class EnvSessionProvider implements SessionProvider {
     return last;
   }
 
-  private async validateTokenOnce(token: string): Promise<ToolResult<ValidationSuccess>> {
+  private async tryValidateAt(apiBase: string, token: string): Promise<ToolResult<ValidationSuccess>> {
     try {
-      const response = await fetch(`${this.apiBaseUrl}/account/query`, {
+      const response = await fetch(`${apiBase.replace(/\/+$/, "")}/account/query`, {
         method: "GET",
         headers: {
           accessToken: token,
@@ -211,6 +223,22 @@ export class EnvSessionProvider implements SessionProvider {
     return session?.access_token ?? null;
   }
 
+  async getCorosApiOrigin(): Promise<string> {
+    // Token from env is often ad-hoc; do not reuse session file api_base (may be another region).
+    if (this.getEnvToken()) {
+      return this.apiBaseUrl;
+    }
+    // Prefer base that just validated this process (session file api_base can be stale vs token).
+    if (this.resolvedValidationBase?.trim()) {
+      return this.resolvedValidationBase.trim().replace(/\/+$/, "");
+    }
+    const session = await this.getStoredSession();
+    if (session?.api_base?.trim()) {
+      return session.api_base.trim().replace(/\/+$/, "");
+    }
+    return this.apiBaseUrl;
+  }
+
   async getAuthStatus(): Promise<ToolResult<AuthStatus>> {
     const envToken = this.getEnvToken();
     const session = envToken ? null : await this.getStoredSession();
@@ -264,6 +292,14 @@ export class EnvSessionProvider implements SessionProvider {
       }
     }
 
+    const prior = await this.getStoredSession();
+    const apiBaseToPersist =
+      validate && this.resolvedValidationBase
+        ? this.resolvedValidationBase
+        : !validate && prior?.api_base
+          ? prior.api_base
+          : undefined;
+
     const session: StoredSession = {
       access_token: trimmedToken,
       source: "session_file",
@@ -273,6 +309,9 @@ export class EnvSessionProvider implements SessionProvider {
       nickname: validation?.ok ? validation.data.nickname : undefined,
       region: validation?.ok ? validation.data.region : undefined,
     };
+    if (apiBaseToPersist) {
+      session.api_base = apiBaseToPersist.replace(/\/+$/, "");
+    }
 
     try {
       await mkdir(path.dirname(this.sessionPath), { recursive: true });
@@ -337,6 +376,7 @@ export class EnvSessionProvider implements SessionProvider {
   async clearSession(): Promise<ToolResult<ClearAuthSessionOutput>> {
     try {
       await rm(this.sessionPath, { force: true });
+      this.resolvedValidationBase = null;
       return {
         ok: true,
         data: {
@@ -362,6 +402,10 @@ export class EnvSessionProvider implements SessionProvider {
 export class PlaceholderSessionProvider implements SessionProvider {
   async getAccessToken(): Promise<string | null> {
     return null;
+  }
+
+  async getCorosApiOrigin(): Promise<string> {
+    return corosApiBaseUrl().replace(/\/+$/, "");
   }
 
   async getAuthStatus(): Promise<ToolResult<AuthStatus>> {

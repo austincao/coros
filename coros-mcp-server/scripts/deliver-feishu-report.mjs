@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { mcpChildEnv } from "./lib/mcp-child-env.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -117,6 +118,7 @@ async function main() {
     command: "node",
     args: ["dist/index.js"],
     cwd: ROOT,
+    env: mcpChildEnv(),
   });
 
   await client.connect(transport);
