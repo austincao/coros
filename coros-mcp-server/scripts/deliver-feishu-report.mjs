@@ -94,7 +94,7 @@ ${JSON.stringify(aiData, null, 2)}
 
 回复请使用简洁的中文，直接给出核心结论和建议，不要有过多的开场白，字数控制在 500 字以内，适合手机阅读。`;
 
-  const model = process.env.QWEN_MODEL || "tongyi-xiaomi-analysis-pro";
+  const model = process.env.QWEN_MODEL || "qwen3.6-max-preview";
 
   const response = await fetch("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
     method: "POST",
